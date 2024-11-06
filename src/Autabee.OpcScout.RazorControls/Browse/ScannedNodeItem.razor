@@ -54,7 +54,11 @@
         }
         else if (ScannedNodeModel.Node.NodeClass == NodeClass.Method)
         {
-            @if (ScannedNodeModel.arguments.InputArguments.Count == 0)
+            @if (ScannedNodeModel.arguments == null)
+            {
+                
+            }
+            else if (ScannedNodeModel.arguments.InputArguments.Count == 0)
             {
                 <button @onclick="OpenDirectCall" title="Call Function"><icon class="mdi mdi-function" /></button>
             }

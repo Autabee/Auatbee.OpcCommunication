@@ -27,9 +27,35 @@ namespace Autabee.OpcToClass
                 exceptions.Add(new ArgumentNullException(nameof(baseNamespace)));
             if (exceptions.Count > 0)
                 throw new AggregateException(exceptions);
-            
+
             this.baseLocation = baseLocation;
             this.baseNamespace = baseNamespace;
+        }
+
+        public GeneratorSettings(GeneratorSettings generatorSettings)
+        {
+            baseLocation = generatorSettings.baseLocation;
+            baseNamespace = generatorSettings.baseNamespace;
+            nodes = generatorSettings.nodes;
+            zipStoreLocation = generatorSettings.zipStoreLocation;
+            clearOnZip = generatorSettings.clearOnZip;
+            typeOverrides = generatorSettings.typeOverrides;
+            nameSpacePrefix = generatorSettings.nameSpacePrefix;
+        }
+
+        public GeneratorSettings() { }
+    }
+
+    public class GeneratorDataSet : GeneratorSettings
+    {
+        public Dictionary<string, OpcEnumTemplate> enums = new Dictionary<string, OpcEnumTemplate>();
+        public Dictionary<string, OpcStructTemplate> structs = new Dictionary<string, OpcStructTemplate>();
+        public GeneratorDataSet(string baseLocation, string baseNamespace) : base(baseLocation, baseNamespace)
+        {
+        }
+
+        public GeneratorDataSet(GeneratorSettings generatorSettings) : base(generatorSettings)
+        {
         }
     }
 }

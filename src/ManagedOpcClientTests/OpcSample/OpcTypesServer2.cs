@@ -5,8 +5,7 @@ using Autabee.Utility.Logger;
 using Autabee.Utility.Logger.xUnit;
 using AutabeeTestFixtures;
 using Opc.Ua;
-using Quickstarts.DataTypes.Instances;
-using Quickstarts.DataTypes.Types;
+using TypeServerNodes;
 using System;
 using System.Collections.Generic;
 using System.Runtime.Serialization;
@@ -16,13 +15,13 @@ using Xunit.Sdk;
 
 namespace Autabee.Communication.OpcCommunicatorTests.OpcSample
 {
-    public class OpcTypeSampleTests : IClassFixture<OpcUaTypeSampleFixture>
+    public class OpcTypeSampleTests2 : IClassFixture<OpcUaTypeSampleFixture>
     {
         private readonly AutabeeManagedOpcClient communicator;
         private readonly bool skipServerNotFound;
         private readonly IAutabeeLogger logger;
 
-        public OpcTypeSampleTests(OpcUaTypeSampleFixture testPlcTestsFixture, ITestOutputHelper outputHelper)
+        public OpcTypeSampleTests2(OpcUaTypeSampleFixture testPlcTestsFixture, ITestOutputHelper outputHelper)
         {
             communicator = testPlcTestsFixture.Communicator;
             skipServerNotFound = testPlcTestsFixture.SkipServerNotFound;
@@ -39,6 +38,8 @@ namespace Autabee.Communication.OpcCommunicatorTests.OpcSample
             //communicator.Session.Factory.AddEncodeableTypes(typeof(ParkingLotType).Assembly);
 
             var data = communicator.ReadValue(vehicleInLot);
+
+
 
             if (data is object[] nData)
             {
@@ -59,7 +60,7 @@ namespace Autabee.Communication.OpcCommunicatorTests.OpcSample
 
             var vehicleInLot = NodeId.Parse("ns=4;i=283");
 
-            communicator.AddTypeAssemby(typeof(ParkingLotType).Assembly);
+            //communicator.AddTypeAssemby(typeof(ParkingLotType).Assembly);
 
             var data = communicator.ReadValue(vehicleInLot) as object[];
 

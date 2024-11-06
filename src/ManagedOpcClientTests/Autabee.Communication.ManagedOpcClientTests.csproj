@@ -41,6 +41,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\TestFixtures\OpcTestFixtures.csproj" />
+    <ProjectReference Include="..\TypeServerNodes\TypeServerNodes.csproj" />
   </ItemGroup>
 
   <ItemGroup>

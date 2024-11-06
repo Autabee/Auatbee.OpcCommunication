@@ -7,7 +7,7 @@
 		<TargetFrameworks>netstandard2.0;net48;net6.0;net8.0</TargetFrameworks>
 		<Description>Functions for generating nodes address space and types </Description>
 		<PackageProjectUrl>https://github.com/Autabee/Autabee.OpcCommunication/tree/main/src/OpcSharper</PackageProjectUrl>
-		<Version>0.1.8</Version>
+		<Version>0.2.0</Version>
 		<PackageTags>opcua;type generator</PackageTags>
 	</PropertyGroup>
 	

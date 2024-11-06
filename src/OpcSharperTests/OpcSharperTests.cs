@@ -54,6 +54,16 @@ namespace Tests
     }
 
     [SkippableFact]
+    public async void GenerateProjectTypeServer()
+    {
+        string file = "config/TypeServer.json";
+
+        SharperTestSettings settings = GetSettings(file);
+        AutabeeManagedOpcClient service = await GetService(settings);
+        OpcSharper.GenerateProject(service, settings.GeneratorSettings, logger);
+    }
+
+        [SkippableFact]
     public async void GenerateProjectTestDataAccess()
     {
       var file = "config/DataAccess.json";

@@ -1,12 +1,18 @@
 ﻿using Autabee.Communication.ManagedOpcClient;
 using Autabee.Communication.ManagedOpcClient.ManagedNode;
+using Newtonsoft.Json.Linq;
 using Opc.Ua;
 using Opc.Ua.Client;
+using Opc.Ua.Schema.Binary;
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.IO;
 using System.Linq;
 using System.Runtime;
+using System.Runtime.InteropServices.ComTypes;
+using System.Runtime.Serialization;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -17,52 +23,87 @@ namespace Autabee.OpcToClass
 {
     public static class OpcToCSharpGenerator
     {
-        static string GetDecoder(XmlNode node, string nsPrefix)
+        public static string GetDecoder(XmlNode node, string nsPrefix, string[] KnownEnums, string decoderName = "decoder")
         {
             var name = GetCorrectedName(node);
             var type = (string)node.Attributes["TypeName"].Value;
+            var typename = GetCorrectedTypeName(node, nsPrefix);
+            return GetDecoder(KnownEnums, decoderName, type, name, typename);
+        }
+
+        public static string GetDecoder(Field node, string[] KnownEnums, string decoderName = "decoder")
+        {
+            return GetDecoder(KnownEnums, decoderName, node.TypeName, node.Name, node.Type);
+        }
+
+
+
+        private static string GetDecoder(string[] KnownEnums, string decoderName, string type, string name, string typename)
+        {
             if (type.Contains("tns:"))
             {
-                var typename = GetCorrectedTypeName(node, nsPrefix);
-                return "ReadEncodeable(\"" + name + "\", typeof(" + typename + ")) as " + typename;
+                if (KnownEnums.Contains(typename))
+                {
+                    return $"({typename}){decoderName}.ReadEnumerated(\"{name}\" ,typeof({typename}))";
+                }
+                return $"{decoderName}.ReadEncodeable(\"{name}\", typeof({typename})) as {typename}";
             }
             else if (type.Contains("opc:"))
             {
-                return $"Read{type.Split(':')[1]}(\"{name}\")";
+                return $"{decoderName}.Read{type.Split(':')[1]}(\"{name}\")";
             }
-            return "Unknown()";
+            return $"{decoderName}.Unknown({type})";
         }
 
-        static string GetEncoder(XmlNode node, string nsPrefix)
+        public static string GetEncoder(XmlNode node, string nsPrefix, string[] KnownEnums, string encoderName = "encoder")
         {
             var type = (string)node.Attributes["TypeName"].Value;
             var name = GetCorrectedName(node);
+            var typename = GetCorrectedTypeName(node, nsPrefix);
+            return GetEncoder(KnownEnums, encoderName, type, name, typename);
+        }
+
+        private static string GetEncoder(string[] KnownEnums, string encoderName, string type, string name, string typename)
+        {
             if (type.Contains("tns:"))
             {
-                var typename = GetCorrectedTypeName(node, nsPrefix);
-                return "WriteEncodeable(\"" + name + "\", this." + name + ", typeof(" + typename + "))";
+                if (KnownEnums.Contains(typename))
+                {
+                    return $"{encoderName}.WriteEnumerated(\"{typename}\", this.{name})";
+                }
+                return $"{encoderName}.WriteEncodeable(\"{name}\", this.{name}, typeof({typename}))";
             }
             else if (type.Contains("opc:"))
             {
-                return $"Write{type.Split(':')[1]}(\"{name}\", this.{name})";
+                return $"{encoderName}.Write{type.Split(':')[1]}(\"{name}\", this.{name})";
             }
-
-            return "Unknown()";
-
+            return $"{encoderName}.Unknown({type})";
         }
 
-        static string GetCorrectedName(XmlNode value)
+        public static string GetEncoder(Field node, string[] KnownEnums, string encoderName = "encoder")
         {
+            return GetEncoder(KnownEnums, encoderName, node.TypeName, node.Name, node.Type);
+        }
+
+
+        public static string GetCorrectedName(XmlNode value)
+        {
+            if (value is XmlAttribute attribute)
+            {
+                return attribute.Value
+                    .Replace("&quot;", "")
+                    .Replace("\"", "");
+            }
             return ((string)value.Attributes["Name"].Value)
                     .Replace("&quot;", "")
                     .Replace("\"", "");
         }
 
-        static string GetCorrectedTypeName(XmlNode value, string nsPrefix)
+        public static string GetCorrectedTypeName(XmlNode value, string nsPrefix)
         {
             return GetCorrectedTypeName((string)value.Attributes["TypeName"].Value, nsPrefix);
         }
-        static string GetCorrectedTypeName(object value, string nsPrefix)
+        public static string GetCorrectedTypeName(object value, string nsPrefix)
         {
             switch (value)
             {
@@ -75,7 +116,7 @@ namespace Autabee.OpcToClass
             }
         }
 
-        static string GetCorrectedTypeName(uint value, string nsPrefix)
+        public static string GetCorrectedTypeName(uint value, string nsPrefix)
         {
 
             return value switch
@@ -106,7 +147,7 @@ namespace Autabee.OpcToClass
             };
         }
 
-        static string GetCorrectedTypeNameFromDataTypes(uint value)
+        public static string GetCorrectedTypeNameFromDataTypes(uint value)
         {
             var result = typeof(DataTypes).GetFields().Where(f => f.FieldType == typeof(uint)).ToList().Where(f => ((uint)f.GetValue(null) == value));
 
@@ -118,7 +159,7 @@ namespace Autabee.OpcToClass
 
         }
 
-        static string GetCorrectedTypeName(string value, string nsPrefix)
+        public static string GetCorrectedTypeName(string value, string nsPrefix)
         {
             if (value.Contains("opc:"))
             {
@@ -154,7 +195,7 @@ namespace Autabee.OpcToClass
                 var temp = value
                     .Replace("&quot;", "")
                     .Replace("\"", "")
-                    .Substring(4).Split('.');
+                    .Split(':').Last().Split('.');
                 if (temp.Length > 1)
                 {
                     value = nsPrefix + string.Join($".{nsPrefix}", temp.Take(temp.Length - 1));
@@ -173,7 +214,7 @@ namespace Autabee.OpcToClass
         }
 
 
-        static Type GetCSharpTypeOfOpc(string opcTypeString)
+        public static Type GetCSharpTypeOfOpc(string opcTypeString)
         {
             switch (opcTypeString)
             {
@@ -257,6 +298,17 @@ namespace Autabee.OpcToClass
         private static Dictionary<string, string> GenerateClassFileConents(XmlDocument xmlDocument, GeneratorSettings settings)
         {
             Dictionary<string, string> scripts = new Dictionary<string, string>();
+            var enumTypes = xmlDocument.GetElementsByTagName("opc:EnumeratedType");
+            string[] enums = new string[enumTypes.Count];
+            for (int i = 0; i < enumTypes.Count; i++)
+            {
+                string name, scriptContent;
+                GetEnumScript(settings, enumTypes, i, out name, out scriptContent);
+
+                scripts[name] = scriptContent;
+                enums[i] = name;
+            }
+
             foreach (XmlNode typedict in xmlDocument.GetElementsByTagName("opc:TypeDictionary"))
             {
                 string targetNamespace = typedict.Attributes["TargetNamespace"].Value;
@@ -264,40 +316,46 @@ namespace Autabee.OpcToClass
                 {
                     if (value.Name == "opc:StructuredType")
                     {
-                        var name = GetCorrectedName(value);
-                        var split = name.Split('.');
-                        var namespaceName = string.Join('.' + settings.nameSpacePrefix, split.Take(split.Length - 1));
-                        namespaceName = string.IsNullOrWhiteSpace(namespaceName)
-                          ? settings.baseNamespace
-                          : settings.baseNamespace + '.' + settings.nameSpacePrefix + namespaceName;
-
-                        var scriptContent = "using Opc.Ua;\n\n"
-                            + "namespace " + namespaceName + "\n{";
-                        scriptContent += GenerateClass(settings.nameSpacePrefix, value, split.Last(), targetNamespace).Replace("\n", "\n\t");
-                        scriptContent += "\n}";
+                        string name, scriptContent;
+                        GetStructScript(settings, enums, targetNamespace, value, out name, out scriptContent);
 
                         scripts[name] = scriptContent;
                     }
-                    if (value.Name == "opc:EnumeratedType")
-                    {
-                        var name = GetCorrectedName(value);
-                        var split = name.Split('.');
-                        var namespaceName = string.Join('.' + settings.nameSpacePrefix, split.Take(split.Length - 1));
-                        namespaceName = string.IsNullOrWhiteSpace(namespaceName)
-                          ? settings.baseNamespace
-                          : settings.baseNamespace + '.' + settings.nameSpacePrefix + namespaceName;
-
-                        var scriptContent = "using Opc.Ua;\n\n"
-                            + "namespace " + namespaceName + "\n{";
-                        scriptContent += GenerateEnum(settings.nameSpacePrefix, value, split.Last()).Replace("\n", "\n\t");
-                        scriptContent += "\n}";
-
-                        scripts[name] = scriptContent;
-                    }
-
                 }
             }
+
             return scripts;
+        }
+
+        private static void GetStructScript(GeneratorSettings settings, string[] enums, string targetNamespace, XmlNode value, out string name, out string scriptContent)
+        {
+            name = GetCorrectedName(value);
+            var split = name.Split('.');
+            var namespaceName = string.Join('.' + settings.nameSpacePrefix, split.Take(split.Length - 1));
+            namespaceName = string.IsNullOrWhiteSpace(namespaceName)
+              ? settings.baseNamespace
+              : settings.baseNamespace + '.' + settings.nameSpacePrefix + namespaceName;
+
+            scriptContent = "using Opc.Ua;\n\n"
+                + "namespace " + namespaceName + "\n{";
+            scriptContent += GenerateClass(settings.nameSpacePrefix, value, split.Last(), targetNamespace, enums).Replace("\n", "\n\t");
+            scriptContent += "\n}";
+        }
+
+        private static void GetEnumScript(GeneratorSettings settings, XmlNodeList enumTypes, int i, out string name, out string scriptContent)
+        {
+            XmlNode value = enumTypes[i];
+            name = GetCorrectedName(value);
+            var split = name.Split('.');
+            var namespaceName = string.Join('.' + settings.nameSpacePrefix, split.Take(split.Length - 1));
+            namespaceName = string.IsNullOrWhiteSpace(namespaceName)
+                ? settings.baseNamespace
+                : settings.baseNamespace + '.' + settings.nameSpacePrefix + namespaceName;
+
+            scriptContent = "using Opc.Ua;\n\n"
+                + "namespace " + namespaceName + "\n{";
+            scriptContent += GenerateEnum(settings.nameSpacePrefix, value, split.Last()).Replace("\n", "\n\t");
+            scriptContent += "\n}";
         }
 
         //private static Dictionary<string, string> GenerateClassScripts(XmlDocument xmlDocument, GeneratorSettings settings)
@@ -358,8 +416,9 @@ namespace Autabee.OpcToClass
 
         }
 
-        private static string GenerateClass(string nsPrefix, XmlNode value, string className, string targetNamespace)
+        private static string GenerateClass(string nsPrefix, XmlNode value, string className, string targetNamespace, string[] KnownEnums = null)
         {
+            if (KnownEnums == null) KnownEnums = new string[0];
             string classData = "\npublic class " + className + " : EncodeableObject"
                         + "\n{";
             foreach (XmlNode field in value.ChildNodes)
@@ -404,8 +463,8 @@ namespace Autabee.OpcToClass
             {
                 if (field.Name == "opc:Field")
                 {
-                    classData += "\n\t\tencoder."
-                        + GetEncoder(field, nsPrefix) + ";";
+                    classData += "\n\t\t"
+                        + GetEncoder(field, nsPrefix, KnownEnums) + ";";
                 }
             }
             classData += "\n\t}";
@@ -417,8 +476,8 @@ namespace Autabee.OpcToClass
             {
                 if (field.Name == "opc:Field")
                 {
-                    classData += $"\n\t\tthis.{GetCorrectedName(field)} = decoder."
-                        + GetDecoder(field, nsPrefix) + ";";
+                    classData += $"\n\t\tthis.{GetCorrectedName(field)} = "
+                        + GetDecoder(field, nsPrefix, KnownEnums) + ";";
                 }
             }
             classData += "\n\t}";
@@ -427,7 +486,7 @@ namespace Autabee.OpcToClass
             return classData;
         }
 
-        private static void CreateFile(string filePath, string fileContents)
+        public static void CreateFile(string filePath, string fileContents)
         {
             using (FileStream stream = File.Create(filePath))
             {
@@ -616,34 +675,5 @@ namespace Autabee.OpcToClass
             }
             return funcName;
         }
-        private struct FunctionDefinitions
-        {
-            public FunctionDefinitions(string returnType, string name, string[] indexItems, string nodeIdString)
-            {
-                ReturnType = returnType;
-                Name = name;
-                IndexItems = indexItems;
-                NodeIdString = nodeIdString;
-            }
-
-            public string Name { get; set; }
-            public string[] IndexItems { get; set; }
-            public string ReturnType { get; set; }
-            public string NodeIdString { get; set; }
-
-            public string Function()
-            {
-                if (IndexItems.Length > 0)
-                {
-
-                    return $"{ReturnType} {Name}({"uint " + string.Join(",uint ", IndexItems)})";
-                }
-                else
-                {
-                    return $"{ReturnType} {Name}()";
-                }
-            }
-        }
     }
-
 }

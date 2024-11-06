@@ -1,0 +1,9 @@
+{
+    "GeneratorSettings": {
+        "baseNamespace": "TypeServerNodes",
+        "baselocation": "..\\..\\..\\..\\TypeServerNodes\\"
+    },
+    "username": null,
+    "password": null,
+    "server": "opc.tcp://localhost:62555/DataTypesServer"
+}
